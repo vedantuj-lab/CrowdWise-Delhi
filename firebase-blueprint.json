@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated CrowdWise Delhi user profile with server-enforced RBAC role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "role": { "type": "string", "enum": ["commuter", "operator", "admin"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "organization": { "type": "string", "maxLength": 160 },
+        "favouriteStopIds": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "email", "role", "status"]
+    },
+    "SavedJourney": {
+      "title": "SavedJourney",
+      "description": "A commuter's bookmarked GTFS bus journey.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "label": { "type": "string", "maxLength": 200 },
+        "savedAt": { "type": "string", "format": "date-time" },
+        "journey": { "type": "object" }
+      },
+      "required": ["id", "userId", "label", "savedAt", "journey"]
+    },
+    "SearchHistoryEntry": {
+      "title": "SearchHistoryEntry",
+      "description": "A commuter's recent GTFS journey search query.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "originStopId": { "type": "string", "maxLength": 128 },
+        "originStopName": { "type": "string", "maxLength": 200 },
+        "destinationStopId": { "type": "string", "maxLength": 128 },
+        "destinationStopName": { "type": "string", "maxLength": 200 },
+        "departureDate": { "type": "string", "maxLength": 32 },
+        "departureTime": { "type": "string", "maxLength": 16 },
+        "preference": { "type": "string", "enum": ["fastest", "balanced", "least_crowded"] },
+        "searchedAt": { "type": "string", "format": "date-time" },
+        "resultsCount": { "type": "number" }
+      },
+      "required": ["id", "userId", "originStopId", "destinationStopId", "searchedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles and RBAC role assignments."
+    },
+    "/users/{uid}/savedJourneys/{journeyId}": {
+      "schema": { "$ref": "#/entities/SavedJourney" },
+      "description": "Private saved bus journeys per authenticated commuter."
+    },
+    "/users/{uid}/searchHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/SearchHistoryEntry" },
+      "description": "Private journey search history per authenticated commuter."
+    }
+  }
+}

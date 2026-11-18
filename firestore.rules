@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'vedantuj@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin()
+        || (isSignedIn()
+            && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active');
+    }
+
+    function isOperator() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function isValidUserCreate(data, uid) {
+      return data.uid == uid
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 200
+        && data.status == 'active'
+        && data.role in ['commuter', 'operator', 'admin'];
+    }
+
+    function isValidUserSelfUpdate(data, uid) {
+      return data.uid == uid
+        && data.status == resource.data.status
+        && data.role in ['commuter', 'operator', 'admin']
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 120
+        && data.email is string && data.email.size() > 0 && data.email.size() <= 200;
+    }
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) || isAdmin() || isOperator();
+      allow list: if isAdmin() || isOperator();
+      allow create: if (isOwner(uid) && isValidUserCreate(request.resource.data, uid)) || isAdmin();
+      allow update: if (isOwner(uid) && isValidUserSelfUpdate(request.resource.data, uid)) || isAdmin();
+      allow delete: if false;
+
+      match /savedJourneys/{journeyId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.userId == uid
+          && request.resource.data.label is string
+          && request.resource.data.label.size() <= 200;
+        allow delete: if isOwner(uid) || isAdmin();
+        allow update: if false;
+      }
+
+      match /searchHistory/{historyId} {
+        allow get, list: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.userId == uid;
+        allow delete: if isOwner(uid) || isAdmin();
+        allow update: if false;
+      }
+    }
+  }
+}
